@@ -1,0 +1,62 @@
+// compute shader
+#version 430
+
+layout (local_size_x = 256) in;
+
+layout (std430, set = 0, binding = 0) buffer particle_xpos_buffer
+{
+  float data [];
+
+} SBO_particle_xpos;
+
+layout (std430, set = 0, binding = 1) buffer particle_ypos_buffer
+{
+  float data [];
+} SBO_particle_ypos;
+
+layout (set = 0, binding = 2) uniform info_buffer
+{
+  uint num_elements;
+  float right_border;
+  float left_border;
+  float top_border;
+  float bottom_border;
+} UBO_info;
+
+layout (push_constant) uniform velocity_push_constants
+{
+  float x_deltavel;
+  float y_deltavel;
+} push_constants;
+
+void main ()
+{
+  const uint i = uint (gl_GlobalInvocationID.x); // get thread index
+
+  //  Make sure we don't access past the buffer size
+  if(i >= UBO_info.num_elements)
+	return;
+
+  // Move particles with the delta velocity
+  SBO_particle_xpos.data[i] += push_constants.x_deltavel;
+  SBO_particle_ypos.data[i] += push_constants.y_deltavel;
+
+  // Shift particles if they go out of bounds
+  if(SBO_particle_xpos.data[i] < UBO_info.left_border)
+  {
+		SBO_particle_xpos.data[i] = UBO_info.right_border + (SBO_particle_xpos.data[i] - UBO_info.left_border);
+  }
+  else if(SBO_particle_xpos.data[i] > UBO_info.right_border)
+  {
+		SBO_particle_xpos.data[i] = UBO_info.left_border + (SBO_particle_xpos.data[i] - UBO_info.right_border);
+  }
+
+  if(SBO_particle_ypos.data[i] > UBO_info.bottom_border)
+  {
+		SBO_particle_ypos.data[i] = UBO_info.top_border  + (SBO_particle_ypos.data[i] - UBO_info.bottom_border);
+  }
+  else if(SBO_particle_ypos.data[i] < UBO_info.top_border)
+  {
+		SBO_particle_ypos.data[i] = UBO_info.bottom_border  + (SBO_particle_ypos.data[i] - UBO_info.top_border);
+  }
+}
