@@ -6,14 +6,16 @@
 // Job structure used to pass work to the ThreadPool
 struct JobBase
 {
+	// Run the function this job points to
 	virtual void DoJob() = 0;
+
 	// Flag to check if the Job has been completed
 	bool _Complete = false;
 };
 
 struct JobOneParam : public JobBase
 {
-	virtual void DoJob() override
+	void DoJob() override
 	{
 		_FuncPtr(_Param);
 	}
@@ -24,7 +26,7 @@ struct JobOneParam : public JobBase
 
 struct JobTwoParams : public JobBase
 {
-	virtual void DoJob() override
+	void DoJob() override
 	{
 		_FuncPtr(_Param1, _Param2);
 	}
@@ -36,7 +38,7 @@ struct JobTwoParams : public JobBase
 
 struct JobThreeParams : public JobBase
 {
-	virtual void DoJob() override
+	void DoJob() override
 	{
 		_FuncPtr(_Param1, _Param2, _Param3);
 	}
@@ -47,10 +49,14 @@ struct JobThreeParams : public JobBase
 	void* _Param3;
 };
 
+
+class ThreadPool;
+
 // Job Pool allocates and reuses Job Objects which are used to provide work
 // to the threadpool
 class JobPool
 {
+	friend class ThreadPool;
 public:
 	// Default constructor, Jobs will be allocated at a page size of 8
 	JobPool()
@@ -67,19 +73,19 @@ public:
 	{
 		for (unsigned i = 0; i < _JobPages_OneParam.size(); ++i)
 		{
-			free(_JobPages_OneParam[i]);
+			delete _JobPages_OneParam[i];
 		}
 		for (unsigned i = 0; i < _JobPages_TwoParams.size(); ++i)
 		{
-			free(_JobPages_TwoParams[i]);
+			delete _JobPages_TwoParams[i];
 		}
 		for (unsigned i = 0; i < _JobPages_ThreeParams.size(); ++i)
 		{
-			free(_JobPages_ThreeParams[i]);
+			delete _JobPages_ThreeParams[i];
 		}
 	}
 
-
+protected:
 	// Returns a one parameter job that's free
 	JobOneParam* GetFreeJob_OneParam();
 	// Returns a two parameter job that's free
@@ -120,7 +126,7 @@ public:
 	bool AreAllThreadsIdle();
 
 	// Waits for all Threads to become idle and all jobs to be completed
-	void WaitForAllThreads();
+	void WaitForAllThreads(bool WaitForWorkStart = true);
 
 	// Returns true if threads were successfully killed
 	bool StopThreads(bool Safely = true);
@@ -169,8 +175,6 @@ private:
 	pthread_mutex_t _NumJobsCompleted_mutex;
 	long long _NumJobsCompleted;
 
-	// Pthread objects to facilitate waiting for the work to finish
-	pthread_cond_t _IdleThreadSignaller;
-	pthread_mutex_t _Wait_mutex;
-
+	// A flag to signal that work has been completed since the last time the threapool was waited on
+	bool _WorkStarted = false;
 };

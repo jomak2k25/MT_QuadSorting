@@ -2,23 +2,18 @@
 
 ThreadPool::ThreadPool(unsigned ThreadCount)
 	:_IdleThreads(0),_JobQueue(), _ThreadCount(ThreadCount), _Threads(ThreadCount), _EndWork(false), _NumJobsCompleted(0)
-{}
-
-bool ThreadPool::Initialise()
 {
-	// Initialise Mutexs
 	pthread_mutex_init(&_IdleThreads_mutex, NULL);
 	pthread_mutex_init(&_JobQueue_mutex, NULL);
 	pthread_mutex_init(&_JobPool_mutex, NULL);
 	pthread_mutex_init(&_NumJobsCompleted_mutex, NULL);
-	pthread_mutex_init(&_Wait_mutex, NULL);
-
 
 	// Initialise conditional variables
 	pthread_cond_init(&_JobSignaller, NULL);
-	pthread_cond_init(&_IdleThreadSignaller, NULL);
+}
 
-
+bool ThreadPool::Initialise()
+{
 	for (unsigned i = 0; i < _ThreadCount; ++i)
 	{
 		_Threads.push_back(pthread_t());
@@ -51,14 +46,16 @@ bool ThreadPool::AreAllThreadsIdle()
 	return AllThreadsIdle;
 }
 
-void ThreadPool::WaitForAllThreads()
+void ThreadPool::WaitForAllThreads(bool WaitForWorkStart)
 {
-	while (!AreAllThreadsIdle())
+	if (WaitForWorkStart)
 	{
-		pthread_mutex_lock(&_Wait_mutex);
-		pthread_cond_wait(&_IdleThreadSignaller,&_Wait_mutex);
-		pthread_mutex_unlock(&_Wait_mutex);
+		while (!_WorkStarted)
+		{}
 	}
+	while (!AreAllThreadsIdle())
+	{}
+	_WorkStarted = false;
 }
 
 bool ThreadPool::StopThreads(bool Safely)
@@ -119,8 +116,9 @@ static JobType* GetFreeJob(std::vector<JobType*>& JobPages, const unsigned PageS
 		}
 	}
 
-	// Allocate a new 
-	JobPages.push_back((JobType*)calloc(PageSize, sizeof(JobType)));
+	// Allocate a new page of jobs
+	JobType* NewPage = new JobType[PageSize];
+	JobPages.push_back(NewPage);
 	for (unsigned i = 1; i < PageSize; ++i)
 	{
 		(JobPages[JobPages.size() - 1] + i)->_Complete = true;
@@ -203,7 +201,6 @@ void* ThreadPool::DoWork(void* arg)
 		{
 			pthread_mutex_lock(&ThisPool->_IdleThreads_mutex);
 			++ThisPool->_IdleThreads;
-			pthread_cond_signal(&ThisPool->_IdleThreadSignaller);
 			pthread_cond_wait(&ThisPool->_JobSignaller, &ThisPool->_IdleThreads_mutex);
 			--ThisPool->_IdleThreads;
 			pthread_mutex_unlock(&ThisPool->_IdleThreads_mutex);
@@ -215,7 +212,7 @@ void* ThreadPool::DoWork(void* arg)
 			pthread_mutex_lock(&ThisPool->_NumJobsCompleted_mutex);
 			++ThisPool->_NumJobsCompleted;
 			pthread_mutex_unlock(&ThisPool->_NumJobsCompleted_mutex);
-
+			ThisPool->_WorkStarted = true;
 		}
 	}
 	return nullptr;

@@ -7,7 +7,7 @@ QuadSortManager::QuadSortManager(unsigned int ThreadCount, ThreadingApproach Ini
     Particles* ParticleContainer, size_t QuadCapacity,
     float l, float t, float r, float b)
     : _TopQuad(nullptr), _ThreadCount(ThreadCount), _CurrentThreadingApproach(InitialThreadingApproach),
-    _QuadQueue_mutex(), _QuadPool_mutex(), _ThreadPool(ThreadCount), _QueueThreads(ThreadCount),
+    _QuadQueue_mutex(), _ThreadPool(ThreadCount), _QueueThreads(ThreadCount),
     _FlatFourThreads()
 {
     _TopQuad = new Quad(ParticleContainer, nullptr, &_QuadPool, QuadCapacity, l,
@@ -16,16 +16,12 @@ QuadSortManager::QuadSortManager(unsigned int ThreadCount, ThreadingApproach Ini
     pthread_mutex_init(&_QuadPool_mutex, NULL);
     pthread_mutex_init(&_QuadQueue_mutex, NULL);
 
-    if (_CurrentThreadingApproach == ThreadingApproach::FlatFourThreading)
+    // Initialise Flat Four Threading infos
+    for (int i = 0; i < 4; ++i)
     {
-        for (int i = 0; i < 4; ++i)
-        {
-            _FlatFourThreadInfos[i]._ThreadID = i;
-            _FlatFourThreadInfos[i]._Manager = this;
-        }
-        
+        _FlatFourThreadInfos[i]._ThreadID = i;
+        _FlatFourThreadInfos[i]._Manager = this;
     }
-
 
     if(_CurrentThreadingApproach == ThreadingApproach::ThreadPool)
     {
@@ -157,7 +153,7 @@ void QuadSortManager::SortParticles()
     }
     else if(_CurrentThreadingApproach == ThreadingApproach::ThreadPool)
     {
-        ThreadPoolQuadSort(_TopQuad, &_ThreadPool);
+        ThreadPoolQuadSort(_TopQuad, this);
 
         // Wait for threads to finish
         _ThreadPool.WaitForAllThreads();
@@ -291,7 +287,7 @@ void QuadSortManager::ThreadPoolQuadSort(void* inData, void* inContext)
             // Acquire an empty job from the thread pool
             JobTwoParams* NewJob = ThisManager->_ThreadPool.GetFreeJob_TwoParams();
             // Fill in the Job data
-            NewJob->_FuncPtr = &ThreadPoolQuadSort;
+            NewJob->_FuncPtr = &QuadSortManager::ThreadPoolQuadSort;
             NewJob->_Param1 = CurrentQuad->_ChildQuads + i;
             NewJob->_Param2 = ThisManager;
 

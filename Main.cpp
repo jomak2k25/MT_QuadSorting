@@ -32,7 +32,7 @@
 static constexpr unsigned int SORT_THREAD_COUNT = 4;
 
 // Global Constants
-static constexpr unsigned NUM_PARTICLES = 256000u;
+static constexpr unsigned NUM_PARTICLES = 256u;
 static constexpr float PARTICLE_RADIUS = 1.f;
 static constexpr float PARTICLE_X_VEL = -18.f;
 static constexpr float PARTICLE_Y_VEL = -25.f;
@@ -58,13 +58,10 @@ long long TotalElapsedTime(0);
 // Global variable for tracking how long it took for the Vulkan Particle machine to update
 long long MachineUpdateTime(0);
 
-// Global variable for tracking and displaying how many quads were used in sorting
-int QuadCount(0);
-
 // The soft capacity of each quad in the quad tree
 static constexpr size_t QUAD_CAPACITY = 4u;
 
-bool EnableQuadSorting = false;
+bool EnableQuadSorting = true;
 
 static QuadSortManager* SortManager = nullptr;
 
